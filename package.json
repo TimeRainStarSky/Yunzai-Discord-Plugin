@@ -1,0 +1,9 @@
+{
+  "name": "Discord-Plugin",
+  "type": "module",
+  "author": "TimeRainStarSky",
+  "dependencies": {
+    "eris": "^0.17.2",
+    "proxy-agent": "^5.0.0"
+  }
+}
