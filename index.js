@@ -24,7 +24,7 @@ async function sendMsg(data, msg) {
     if (typeof i != "object")
       i = { type: "text", data: { text: i }}
     else if (!i.data)
-      i = { type: i.type, data: { ...i }}
+      i = { type: i.type, data: { ...i, type: undefined }}
     switch (i.type) {
       case "text":
         content += i.data.text
