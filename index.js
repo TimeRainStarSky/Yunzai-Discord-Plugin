@@ -20,7 +20,11 @@ async function sendMsg(data, msg) {
   let msgs = ""
   let content = ""
   const file = []
-  for (let i of msg)
+  for (let i of msg) {
+    if (typeof i != "object")
+      i = { type: "text", data: { text: i }}
+    else if (!i.data)
+      i = { type: i.type, data: { ...i }}
     switch (i.type) {
       case "text":
         content += i.data.text
@@ -46,6 +50,7 @@ async function sendMsg(data, msg) {
           i = JSON.stringify(i)
         content += i
     }
+  }
   logger.info(`${logger.blue(`[${data.self_id}]`)} 发送消息：[${data.id}] ${content}${msgs}`)
   return data.bot.createMessage(data.id, content, file)
 }
