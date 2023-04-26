@@ -15,7 +15,8 @@ TRSS-Yunzai Discord Bot 适配器 插件
 
 1. 准备：[TRSS-Yunzai](../../../Yunzai)
 
-2. 安装：[GitHub](https://github.com/TimeRainStarSky/Yunzai-Discord-Plugin) 或 [Gitee](https://gitee.com/TimeRainStarSky/Yunzai-Discord-Plugin)
+2. 自动安装：`#安装Discord-Plugin`
+- 手动安装：[GitHub](https://github.com/TimeRainStarSky/Yunzai-Discord-Plugin) 或 [Gitee](https://gitee.com/TimeRainStarSky/Yunzai-Discord-Plugin)
 
 ```
 git clone --depth 1 https://gitee.com/TimeRainStarSky/Yunzai-Discord-Plugin plugins/Discord-Plugin
