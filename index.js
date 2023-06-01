@@ -48,7 +48,7 @@ const adapter = new class DiscordAdapter {
           if (i.data.qq == "all")
             content += "@everyone"
           else
-            content += `<@${i.data.qq}>`
+            content += `<@${i.data.qq.replace(/^dc_/, "")}>`
           break
         default:
           i = JSON.stringify(i)
@@ -79,8 +79,30 @@ const adapter = new class DiscordAdapter {
     data.message = []
     data.raw_message = ""
     if (data.content) {
-      data.message.push({ type: "text", text: data.content })
-      data.raw_message += data.content
+      const match = data.content.match(/<@.+?>/g)
+      if (match) {
+        let content = data.content
+        for (const i of match) {
+          const msg = content.split(i)
+          const prev_msg = msg.shift()
+          if (prev_msg) {
+            data.message.push({ type: "text", text: prev_msg })
+            data.raw_message += prev_msg
+          }
+          content = msg.join(i)
+
+          const qq = `dc_${i.replace(/<@(.+?)>/, "$1")}`
+          data.message.push({ type: "at", qq })
+          data.raw_message += `[提及：${qq}]`
+        }
+        if (content) {
+          data.message.push({ type: "text", text: content })
+          data.raw_message += content
+        }
+      } else {
+        data.message.push({ type: "text", text: data.content })
+        data.raw_message += data.content
+      }
     }
 
     if (!Bot[data.self_id].fl.has(data.user_id))
