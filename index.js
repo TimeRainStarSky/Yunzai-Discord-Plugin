@@ -1,9 +1,9 @@
 logger.info(logger.yellow("- 正在加载 Discord 插件"))
 
 import { config, configSave } from "./Model/config.js"
+import fetch from "node-fetch"
 import Eris from "eris"
-import ProxyAgent from "proxy-agent"
-const agent = new ProxyAgent(config.proxy)
+import { HttpsProxyAgent } from "https-proxy-agent"
 
 const adapter = new class DiscordAdapter {
   async makeBuffer(file) {
@@ -102,15 +102,24 @@ const adapter = new class DiscordAdapter {
   }
 
   async connect(token) {
-    const bot = new Eris(`Bot ${token}`, {
+    const args = {
       intents: ["all"],
-      ws: { agent },
-      rest: { agent, ...config.reverseProxy ? { domain: config.reverseProxy }:{}}
-    })
-    bot.on("error", logger.error)
+      ws: {},
+      rest: {},
+    }
 
+    if (config.proxy) {
+      args.ws.agent = new HttpsProxyAgent(config.proxy)
+      args.rest.agent = args.ws.agent
+    }
+
+    if (config.reverseProxy)
+      args.rest.domain = config.reverseProxy
+
+    const bot = new Eris(`Bot ${token}`, args)
+    bot.on("error", logger.error)
     bot.connect()
-    await new Promise(resolve => bot.once("ready", () => resolve()))
+    await new Promise(resolve => bot.once("ready", resolve))
 
     if (!bot.user.id) {
       logger.error(`${logger.blue(`[${token}]`)} DiscordBot 连接失败`)
