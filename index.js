@@ -64,6 +64,14 @@ const adapter = new class DiscordAdapter {
     return this.sendMsg(data, msg)
   }
 
+  async makeForwardMsg(send, msg) {
+    const messages = []
+    for (const i of msg)
+      messages.push(await send(i.message))
+    messages.data = "消息"
+    return messages
+  }
+
   async getAvatarUrl(data) {
     return data.bot.fl.get(data.user_id)?.avatarURL || (await data.bot.getDMChannel(data.user_id)).recipient.avatarURL
   }
@@ -129,14 +137,6 @@ const adapter = new class DiscordAdapter {
     Bot.emit(`${data.post_type}`, data)
   }
 
-  async makeForwardMsg(data, msg) {
-    const messages = []
-    for (const i of msg)
-      messages.push(await this.sendMsg(data, i.message))
-    messages.data = "消息"
-    return messages
-  }
-
   async connect(token) {
     const args = {
       intents: ["all"],
@@ -187,7 +187,7 @@ const adapter = new class DiscordAdapter {
       return {
         sendMsg: msg => this.sendFriendMsg(i, msg),
         recallMsg: () => false,
-        makeForwardMsg: msg => this.makeForwardMsg(i, msg),
+        makeForwardMsg: msg => this.makeForwardMsg(msg => this.sendFriendMsg(i, msg), msg),
         getAvatarUrl: () => this.getAvatarUrl(i),
       }
     }
@@ -214,7 +214,7 @@ const adapter = new class DiscordAdapter {
       return {
         sendMsg: msg => this.sendMsg(i, msg),
         recallMsg: () => false,
-        makeForwardMsg: msg => this.makeForwardMsg(i, msg),
+        makeForwardMsg: msg => this.makeForwardMsg(msg => this.sendMsg(i, msg), msg),
         pickMember: user_id => i.bot.pickMember(i.id, user_id),
       }
     }
