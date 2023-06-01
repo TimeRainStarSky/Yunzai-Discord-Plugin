@@ -45,6 +45,10 @@ const adapter = new class DiscordAdapter {
         case "reply":
           break
         case "at":
+          if (i.data.qq == "all")
+            content += "@everyone"
+          else
+            content += `<@${i.data.qq}>`
           break
         default:
           i = JSON.stringify(i)
@@ -55,10 +59,20 @@ const adapter = new class DiscordAdapter {
     return data.bot.createMessage(data.id, content, file)
   }
 
+  async sendFriendMsg(data, msg) {
+    data.id = (await data.bot.getDMChannel(data.user_id)).id
+    return this.sendMsg(data, msg)
+  }
+
+  async getAvatarUrl(data) {
+    return data.bot.fl.get(data.user_id)?.avatarURL || (await data.bot.getDMChannel(data.user_id)).recipient.avatarURL
+  }
+
   makeMessage(data) {
     data.user_id = `dc_${data.author.id}`
     data.sender = {
-      nickname: data.author.username
+      nickname: data.author.username,
+      avatar: data.author.avatarURL,
     }
     data.post_type = "message"
 
@@ -68,6 +82,9 @@ const adapter = new class DiscordAdapter {
       data.message.push({ type: "text", text: data.content })
       data.raw_message += data.content
     }
+
+    if (!Bot[data.self_id].fl.has(data.user_id))
+      Bot[data.self_id].fl.set(data.user_id, data.author)
 
     if (data.guildID) {
       data.message_type = "group"
@@ -82,9 +99,6 @@ const adapter = new class DiscordAdapter {
       data.member = data.group.pickMember(data.user_id)
     } else {
       data.message_type = "private"
-      if (!Bot[data.self_id].fl.has(data.user_id))
-        Bot[data.self_id].fl.set(data.user_id, data.channel)
-
       logger.info(`${logger.blue(`[${data.self_id}]`)} 好友消息：[${data.sender.nickname}(${data.user_id})] ${data.raw_message}`)
       data.friend = data.bot.pickFriend(data.user_id)
     }
@@ -132,6 +146,7 @@ const adapter = new class DiscordAdapter {
     Bot[id].info = Bot[id].user
     Bot[id].uin = id
     Bot[id].nickname = Bot[id].info.username
+    Bot[id].avatar = Bot[id].info.avatarURL
     Bot[id].version = {
       impl: "DiscordBot",
       version: config.package.dependencies.eris,
@@ -145,12 +160,13 @@ const adapter = new class DiscordAdapter {
       const i = {
         self_id: id,
         bot: Bot[id],
-        id: Bot[id].fl.get(user_id)?.id ?? user_id.replace(/^dc_/, ""),
+        user_id: user_id.replace(/^dc_/, ""),
       }
       return {
-        sendMsg: msg => this.sendMsg(i, msg),
+        sendMsg: msg => this.sendFriendMsg(i, msg),
         recallMsg: () => false,
         makeForwardMsg: msg => this.makeForwardMsg(i, msg),
+        getAvatarUrl: () => this.getAvatarUrl(i),
       }
     }
     Bot[id].pickUser = Bot[id].pickFriend
@@ -160,7 +176,7 @@ const adapter = new class DiscordAdapter {
         self_id: id,
         bot: Bot[id],
         group_id: group_id.replace(/^dc_/, ""),
-        user_id: Bot[id].fl.get(user_id)?.id ?? user_id.replace(/^dc_/, ""),
+        user_id: user_id.replace(/^dc_/, ""),
       }
       return {
         ...Bot[id].pickFriend(user_id),
