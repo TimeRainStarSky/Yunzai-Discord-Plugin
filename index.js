@@ -50,6 +50,9 @@ const adapter = new class DiscordAdapter {
           else
             content += `<@${i.data.qq.replace(/^dc_/, "")}>`
           break
+        case "node":
+          await this.sendForwardMsg(msg => this.sendMsg(data, msg), i.data)
+          break
         default:
           i = JSON.stringify(i)
           content += i
@@ -64,11 +67,10 @@ const adapter = new class DiscordAdapter {
     return this.sendMsg(data, msg)
   }
 
-  async makeForwardMsg(send, msg) {
+  async sendForwardMsg(send, msg) {
     const messages = []
     for (const i of msg)
       messages.push(await send(i.message))
-    messages.data = "消息"
     return messages
   }
 
@@ -76,13 +78,44 @@ const adapter = new class DiscordAdapter {
     return data.bot.fl.get(data.user_id)?.avatarURL || (await data.bot.getDMChannel(data.user_id)).recipient.avatarURL
   }
 
+  pickFriend(id, user_id) {
+    const i = { self_id: id, bot: Bot[id], user_id: user_id.replace(/^dc_/, "") }
+    return {
+      sendMsg: msg => this.sendFriendMsg(i, msg),
+      recallMsg: () => false,
+      makeForwardMsg: Bot.makeForwardMsg,
+      sendForwardMsg: msg => this.sendForwardMsg(msg => this.sendFriendMsg(i, msg), msg),
+      getAvatarUrl: () => this.getAvatarUrl(i),
+    }
+  }
+
+  pickMember(id, group_id, user_id) {
+    const i = { self_id: id, bot: Bot[id], group_id: group_id.replace(/^dc_/, ""), user_id: user_id.replace(/^dc_/, "") }
+    return {
+      ...this.pickFriend(id, user_id),
+    }
+  }
+
+  pickGroup(id, group_id) {
+    const i = { self_id: id, bot: Bot[id], id: group_id.replace(/^dc_/, "") }
+    return {
+      sendMsg: msg => this.sendMsg(i, msg),
+      recallMsg: () => false,
+      makeForwardMsg: Bot.makeForwardMsg,
+      sendForwardMsg: msg => this.sendForwardMsg(msg => this.sendMsg(i, msg), msg),
+      pickMember: user_id => this.pickMember(id, i.id, user_id),
+    }
+  }
+
   makeMessage(data) {
+    data.post_type = "message"
     data.user_id = `dc_${data.author.id}`
     data.sender = {
+      user_id: data.user_id,
       nickname: data.author.username,
       avatar: data.author.avatarURL,
     }
-    data.post_type = "message"
+    data.bot.fl.set(data.user_id, { ...data.author, ...data.sender })
 
     data.message = []
     data.raw_message = ""
@@ -113,15 +146,15 @@ const adapter = new class DiscordAdapter {
       }
     }
 
-    if (!Bot[data.self_id].fl.has(data.user_id))
-      Bot[data.self_id].fl.set(data.user_id, data.author)
-
     if (data.guildID) {
       data.message_type = "group"
       data.group_id = `dc_${data.channel.id}`
-      data.group_name = data.channel.name
-      if (!Bot[data.self_id].gl.has(data.group_id))
-        Bot[data.self_id].gl.set(data.group_id, data.channel)
+      data.group_name = `${data.channel.guild.name}-${data.channel.name}`
+      data.bot.gl.set(data.group_id, {
+        ...data.channel,
+        group_id: data.group_id,
+        group_name: data.group_name,
+      })
 
       logger.info(`${logger.blue(`[${data.self_id}]`)} 群消息：[${data.group_name}(${data.group_id}), ${data.sender.nickname}(${data.user_id})] ${data.raw_message}`)
       data.friend = data.bot.pickFriend(data.user_id)
@@ -138,21 +171,21 @@ const adapter = new class DiscordAdapter {
   }
 
   async connect(token) {
-    const args = {
+    const options = {
       intents: ["all"],
       ws: {},
       rest: {},
     }
 
     if (config.proxy) {
-      args.ws.agent = new HttpsProxyAgent(config.proxy)
-      args.rest.agent = args.ws.agent
+      options.ws.agent = new HttpsProxyAgent(config.proxy)
+      options.rest.agent = options.ws.agent
     }
 
     if (config.reverseProxy)
-      args.rest.domain = config.reverseProxy
+      options.rest.domain = config.reverseProxy
 
-    const bot = new Eris(`Bot ${token}`, args)
+    const bot = new Eris(`Bot ${token}`, options)
     bot.on("error", logger.error)
     bot.connect()
     await new Promise(resolve => bot.once("ready", resolve))
@@ -178,46 +211,11 @@ const adapter = new class DiscordAdapter {
     Bot[id].fl = new Map()
     Bot[id].gl = new Map()
 
-    Bot[id].pickFriend = user_id => {
-      const i = {
-        self_id: id,
-        bot: Bot[id],
-        user_id: user_id.replace(/^dc_/, ""),
-      }
-      return {
-        sendMsg: msg => this.sendFriendMsg(i, msg),
-        recallMsg: () => false,
-        makeForwardMsg: msg => this.makeForwardMsg(msg => this.sendFriendMsg(i, msg), msg),
-        getAvatarUrl: () => this.getAvatarUrl(i),
-      }
-    }
+    Bot[id].pickFriend = user_id => this.pickFriend(id, user_id)
     Bot[id].pickUser = Bot[id].pickFriend
 
-    Bot[id].pickMember = (group_id, user_id) => {
-      const i = {
-        self_id: id,
-        bot: Bot[id],
-        group_id: group_id.replace(/^dc_/, ""),
-        user_id: user_id.replace(/^dc_/, ""),
-      }
-      return {
-        ...Bot[id].pickFriend(user_id),
-      }
-    }
-
-    Bot[id].pickGroup = group_id => {
-      const i = {
-        self_id: id,
-        bot: Bot[id],
-        id: group_id.replace(/^dc_/, ""),
-      }
-      return {
-        sendMsg: msg => this.sendMsg(i, msg),
-        recallMsg: () => false,
-        makeForwardMsg: msg => this.makeForwardMsg(msg => this.sendMsg(i, msg), msg),
-        pickMember: user_id => i.bot.pickMember(i.id, user_id),
-      }
-    }
+    Bot[id].pickMember = (group_id, user_id) => this.pickMember(id, group_id, user_id)
+    Bot[id].pickGroup = group_id => this.pickGroup(id, group_id)
 
     if (Array.isArray(Bot.uin)) {
       if (!Bot.uin.includes(id))
