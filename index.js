@@ -6,6 +6,11 @@ import Eris from "eris"
 import { HttpsProxyAgent } from "https-proxy-agent"
 
 const adapter = new class DiscordAdapter {
+  constructor() {
+    this.id = "Discord"
+    this.name = "DiscordBot"
+  }
+
   async makeBuffer(file) {
     if (file.match(/^base64:\/\//))
       return Buffer.from(file.replace(/^base64:\/\//, ""), "base64")
@@ -79,8 +84,14 @@ const adapter = new class DiscordAdapter {
   }
 
   pickFriend(id, user_id) {
-    const i = { self_id: id, bot: Bot[id], user_id: user_id.replace(/^dc_/, "") }
+    const i = {
+      ...Bot[id].fl.get(user_id),
+      self_id: id,
+      bot: Bot[id],
+      user_id: user_id.replace(/^dc_/, ""),
+    }
     return {
+      ...i,
       sendMsg: msg => this.sendFriendMsg(i, msg),
       recallMsg: () => false,
       makeForwardMsg: Bot.makeForwardMsg,
@@ -90,15 +101,28 @@ const adapter = new class DiscordAdapter {
   }
 
   pickMember(id, group_id, user_id) {
-    const i = { self_id: id, bot: Bot[id], group_id: group_id.replace(/^dc_/, ""), user_id: user_id.replace(/^dc_/, "") }
+    const i = {
+      ...Bot[id].fl.get(user_id),
+      self_id: id,
+      bot: Bot[id],
+      group_id: group_id.replace(/^dc_/, ""),
+      user_id: user_id.replace(/^dc_/, ""),
+    }
     return {
       ...this.pickFriend(id, user_id),
+      ...i,
     }
   }
 
   pickGroup(id, group_id) {
-    const i = { self_id: id, bot: Bot[id], id: group_id.replace(/^dc_/, "") }
+    const i = {
+      ...Bot[id].gl.get(group_id),
+      self_id: id,
+      bot: Bot[id],
+      id: group_id.replace(/^dc_/, ""),
+    }
     return {
+      ...i,
       sendMsg: msg => this.sendMsg(i, msg),
       recallMsg: () => false,
       makeForwardMsg: Bot.makeForwardMsg,
@@ -191,7 +215,7 @@ const adapter = new class DiscordAdapter {
     await new Promise(resolve => bot.once("ready", resolve))
 
     if (!bot.user.id) {
-      logger.error(`${logger.blue(`[${token}]`)} DiscordBot 连接失败`)
+      logger.error(`${logger.blue(`[${token}]`)} ${this.name}(${this.id}) 连接失败`)
       bot.disconnect()
       return false
     }
@@ -203,9 +227,9 @@ const adapter = new class DiscordAdapter {
     Bot[id].nickname = Bot[id].info.username
     Bot[id].avatar = Bot[id].info.avatarURL
     Bot[id].version = {
-      impl: "DiscordBot",
+      id: this.id,
+      name: this.name,
       version: config.package.dependencies.eris,
-      onebot_version: "v11",
     }
     Bot[id].stat = { start_time: Bot[id].startTime/1000 }
     Bot[id].fl = new Map()
@@ -217,12 +241,8 @@ const adapter = new class DiscordAdapter {
     Bot[id].pickMember = (group_id, user_id) => this.pickMember(id, group_id, user_id)
     Bot[id].pickGroup = group_id => this.pickGroup(id, group_id)
 
-    if (Array.isArray(Bot.uin)) {
-      if (!Bot.uin.includes(id))
-        Bot.uin.push(id)
-    } else {
-      Bot.uin = [id]
-    }
+    if (!Bot.uin.includes(id))
+      Bot.uin.push(id)
 
     bot.on("messageCreate", data => {
       data.self_id = id
@@ -230,20 +250,23 @@ const adapter = new class DiscordAdapter {
       this.makeMessage(data)
     })
 
-    logger.mark(`${logger.blue(`[${id}]`)} DiscordBot 已连接`)
+    logger.mark(`${logger.blue(`[${id}]`)} ${this.name}(${this.id}) 已连接`)
     Bot.emit(`connect.${id}`, Bot[id])
     Bot.emit(`connect`, Bot[id])
     return true
   }
+
+  async load() {
+    for (const token of config.token)
+      await adapter.connect(token)
+    return true
+  }
 }
 
-Bot.once("online", async () => {
-  for (const token of config.token)
-    await adapter.connect(token)
-})
+Bot.adapter.push(adapter)
 
 export class Discord extends plugin {
-  constructor () {
+  constructor() {
     super({
       name: "Discord",
       dsc: "Discord",
