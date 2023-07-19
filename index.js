@@ -16,8 +16,7 @@ const adapter = new class DiscordAdapter {
       return Buffer.from(file.replace(/^base64:\/\//, ""), "base64")
     else if (file.match(/^https?:\/\//))
       return Buffer.from(await (await fetch(file)).arrayBuffer())
-    else
-      return file
+    return file
   }
 
   async sendMsg(data, msg) {
@@ -56,7 +55,7 @@ const adapter = new class DiscordAdapter {
             content += `<@${i.data.qq.replace(/^dc_/, "")}>`
           break
         case "node":
-          await this.sendForwardMsg(msg => this.sendMsg(data, msg), i.data)
+          await Bot.sendForwardMsg(msg => this.sendMsg(data, msg), i.data)
           break
         default:
           i = JSON.stringify(i)
@@ -70,13 +69,6 @@ const adapter = new class DiscordAdapter {
   async sendFriendMsg(data, msg) {
     data.id = (await data.bot.getDMChannel(data.user_id)).id
     return this.sendMsg(data, msg)
-  }
-
-  async sendForwardMsg(send, msg) {
-    const messages = []
-    for (const i of msg)
-      messages.push(await send(i.message))
-    return messages
   }
 
   async getAvatarUrl(data) {
@@ -95,7 +87,8 @@ const adapter = new class DiscordAdapter {
       sendMsg: msg => this.sendFriendMsg(i, msg),
       recallMsg: () => false,
       makeForwardMsg: Bot.makeForwardMsg,
-      sendForwardMsg: msg => this.sendForwardMsg(msg => this.sendFriendMsg(i, msg), msg),
+      sendForwardMsg: msg => Bot.sendForwardMsg(msg => this.sendFriendMsg(i, msg), msg),
+      getInfo: () => i,
       getAvatarUrl: () => this.getAvatarUrl(i),
     }
   }
@@ -126,7 +119,8 @@ const adapter = new class DiscordAdapter {
       sendMsg: msg => this.sendMsg(i, msg),
       recallMsg: () => false,
       makeForwardMsg: Bot.makeForwardMsg,
-      sendForwardMsg: msg => this.sendForwardMsg(msg => this.sendMsg(i, msg), msg),
+      sendForwardMsg: msg => Bot.sendForwardMsg(msg => this.sendMsg(i, msg), msg),
+      getInfo: () => i,
       pickMember: user_id => this.pickMember(id, i.id, user_id),
     }
   }
@@ -222,6 +216,7 @@ const adapter = new class DiscordAdapter {
 
     const id = `dc_${bot.user.id}`
     Bot[id] = bot
+    Bot[id].adapter = this
     Bot[id].info = Bot[id].user
     Bot[id].uin = id
     Bot[id].nickname = Bot[id].info.username
@@ -275,27 +270,27 @@ export class Discord extends plugin {
         {
           reg: "^#[Dd][Cc]账号$",
           fnc: "List",
-          permission: "master"
+          permission: config.permission,
         },
         {
           reg: "^#[Dd][Cc]设置.+$",
           fnc: "Token",
-          permission: "master"
+          permission: config.permission,
         },
         {
           reg: "^#[Dd][Cc](代理|反代)",
           fnc: "Proxy",
-          permission: "master"
+          permission: config.permission,
         }
       ]
     })
   }
 
-  async List () {
+  async List() {
     await this.reply(`共${config.token.length}个账号：\n${config.token.join("\n")}`, true)
   }
 
-  async Token () {
+  async Token() {
     let token = this.e.msg.replace(/^#[Dd][Cc]设置/, "").trim()
     if (config.token.includes(token)) {
       config.token = config.token.filter(item => item != token)
@@ -312,7 +307,7 @@ export class Discord extends plugin {
     configSave(config)
   }
 
-  async Proxy () {
+  async Proxy() {
     let proxy = this.e.msg.replace(/^#[Dd][Cc](代理|反代)/, "").trim()
     if (this.e.msg.match("代理")) {
       config.proxy = proxy
