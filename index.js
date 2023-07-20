@@ -247,7 +247,7 @@ const adapter = new class DiscordAdapter {
 
     logger.mark(`${logger.blue(`[${id}]`)} ${this.name}(${this.id}) 已连接`)
     Bot.emit(`connect.${id}`, Bot[id])
-    Bot.emit(`connect`, Bot[id])
+    Bot.emit("connect", Bot[id])
     return true
   }
 
