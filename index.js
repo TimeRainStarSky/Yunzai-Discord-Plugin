@@ -1,4 +1,4 @@
-logger.info(logger.yellow("- 正在加载 Discord 插件"))
+logger.info(logger.yellow("- 正在加载 Discord 适配器插件"))
 
 import { config, configSave } from "./Model/config.js"
 import fetch from "node-fetch"
@@ -263,8 +263,8 @@ Bot.adapter.push(adapter)
 export class Discord extends plugin {
   constructor() {
     super({
-      name: "Discord",
-      dsc: "Discord",
+      name: "DiscordAdapter",
+      dsc: "Discord 适配器设置",
       event: "message",
       rule: [
         {
@@ -320,4 +320,4 @@ export class Discord extends plugin {
   }
 }
 
-logger.info(logger.green("- Discord 插件 加载完成"))
+logger.info(logger.green("- Discord 适配器插件 加载完成"))
