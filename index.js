@@ -206,9 +206,12 @@ const adapter = new class DiscordAdapter {
     const bot = new Eris(`Bot ${token}`, options)
     bot.on("error", logger.error)
     bot.connect()
-    await new Promise(resolve => bot.once("ready", resolve))
+    await new Promise(resolve => {
+      bot.once("ready", resolve)
+      bot.once("error", resolve)
+    })
 
-    if (!bot.user.id) {
+    if (!bot.user?.id) {
       logger.error(`${logger.blue(`[${token}]`)} ${this.name}(${this.id}) 连接失败`)
       bot.disconnect()
       return false
