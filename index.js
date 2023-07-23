@@ -19,12 +19,12 @@ const adapter = new class DiscordAdapter {
     return file
   }
 
-  async sendMsg(data, msg) {
+  async makeMsg(msg) {
     if (!Array.isArray(msg))
       msg = [msg]
-    let msgs = ""
-    let content = ""
+    let content = "", msgs = ""
     const file = []
+
     for (let i of msg) {
       if (typeof i != "object")
         i = { type: "text", data: { text: i }}
@@ -55,15 +55,51 @@ const adapter = new class DiscordAdapter {
             content += `<@${i.data.qq.replace(/^dc_/, "")}>`
           break
         case "node":
-          await Bot.sendForwardMsg(msg => this.sendMsg(data, msg), i.data)
+          for (const { message } of i.data) {
+            const ret = await this.makeMsg(message)
+            if (ret.msgs)
+              msgs += `\n${ret.msgs}`
+            if (ret.content)
+              content += `\n${ret.content}`
+            file.push(...ret.file)
+          }
           break
         default:
           i = JSON.stringify(i)
           content += i
       }
     }
+    return { content, msgs, file }
+  }
+
+  async sendMsg(data, msg) {
+    const { content, msgs, file } = await this.makeMsg(msg)
     logger.info(`${logger.blue(`[${data.self_id}]`)} 发送消息：[${data.id}] ${content}${msgs}`)
-    return data.bot.createMessage(data.id, content, file)
+    const ret = await data.bot.createMessage(data.id, content, file)
+    return { data: ret, message_id: ret.id }
+  }
+
+  async sendFriendMsg(data, msg) {
+    data.id = (await this.getFriendInfo(data)).id
+    return this.sendMsg(data, msg)
+  }
+
+  async getMsg(data, message_id) {
+    return this.makeMessageArray(await data.bot.getMessage(data.id, message_id))
+  }
+
+  async getFriendMsg(data, message_id) {
+    data.id = (await this.getFriendInfo(data)).id
+    return this.getMsg(data, message_id)
+  }
+
+  recallMsg(data, message_id) {
+    return data.bot.deleteMessage(data.id, message_id)
+  }
+
+  async recallFriendMsg(data, message_id) {
+    data.id = (await this.getFriendInfo(data)).id
+    return this.recallMsg(data, message_id)
   }
 
   async getFriendInfo(data) {
@@ -74,11 +110,6 @@ const adapter = new class DiscordAdapter {
       nickname: i.recipient.username,
       avatar: i.recipient.avatarURL,
     }
-  }
-
-  async sendFriendMsg(data, msg) {
-    data.id = (await this.getFriendInfo(data)).id
-    return this.sendMsg(data, msg)
   }
 
   getFriendArray(id) {
@@ -144,7 +175,8 @@ const adapter = new class DiscordAdapter {
     return {
       ...i,
       sendMsg: msg => this.sendFriendMsg(i, msg),
-      recallMsg: () => false,
+      getMsg: message_id => this.getFriendMsg(i, message_id),
+      recallMsg: message_id => this.recallFriendMsg(i, message_id),
       makeForwardMsg: Bot.makeForwardMsg,
       sendForwardMsg: msg => Bot.sendForwardMsg(msg => this.sendFriendMsg(i, msg), msg),
       getInfo: () => this.getFriendInfo(i),
@@ -176,7 +208,8 @@ const adapter = new class DiscordAdapter {
     return {
       ...i,
       sendMsg: msg => this.sendMsg(i, msg),
-      recallMsg: () => false,
+      getMsg: message_id => this.getMsg(i, message_id),
+      recallMsg: message_id => this.recallMsg(i, message_id),
       makeForwardMsg: Bot.makeForwardMsg,
       sendForwardMsg: msg => Bot.sendForwardMsg(msg => this.sendMsg(i, msg), msg),
       getInfo: () => i,
@@ -185,17 +218,23 @@ const adapter = new class DiscordAdapter {
     }
   }
 
-  makeMessage(data) {
-    data.post_type = "message"
+  makeMessageArray(data) {
     data.user_id = `dc_${data.author.id}`
     data.sender = {
       user_id: data.user_id,
       nickname: data.author.username,
       avatar: data.author.avatarURL,
     }
+    data.message_id = data.id
 
     data.message = []
     data.raw_message = ""
+
+    if (data.messageReference?.messageID) {
+      data.message.push({ type: "reply", id: data.messageReference.messageID })
+      data.raw_message += `[回复：${data.messageReference.messageID}]`
+    }
+
     if (data.content) {
       const match = data.content.match(/<@.+?>/g)
       if (match) {
@@ -222,6 +261,20 @@ const adapter = new class DiscordAdapter {
         data.raw_message += data.content
       }
     }
+
+    for (const i of data.attachments) {
+      i.type = i.content_type.split("/")[0]
+      i.file = i.filename
+      data.message.push(i)
+      data.raw_message += JSON.stringify(i)
+    }
+
+    return data
+  }
+
+  makeMessage(data) {
+    data.post_type = "message"
+    data = this.makeMessageArray(data)
 
     if (data.guildID) {
       data.message_type = "group"
