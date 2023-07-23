@@ -66,13 +66,72 @@ const adapter = new class DiscordAdapter {
     return data.bot.createMessage(data.id, content, file)
   }
 
+  async getFriendInfo(data) {
+    const i = await data.bot.getDMChannel(data.user_id)
+    return {
+      ...i,
+      user_id: i.recipient.id,
+      nickname: i.recipient.username,
+      avatar: i.recipient.avatarURL,
+    }
+  }
+
   async sendFriendMsg(data, msg) {
-    data.id = (await data.bot.getDMChannel(data.user_id)).id
+    data.id = (await this.getFriendInfo(data)).id
     return this.sendMsg(data, msg)
   }
 
-  async getAvatarUrl(data) {
-    return data.bot.fl.get(data.user_id)?.avatarURL || (await data.bot.getDMChannel(data.user_id)).recipient.avatarURL
+  getFriendArray(id) {
+    const array = []
+    for (const [user_id, i] of Bot[id].users)
+      array.push({
+        user: i,
+        user_id: `dc_${user_id}`,
+        nickname: i.username,
+        avatar: i.avatarURL,
+      })
+    return array
+  }
+
+  getFriendList(id) {
+    const array = []
+    for (const { user_id } of this.getFriendArray(id))
+      array.push(user_id)
+    return array
+  }
+
+  getFriendMap(id) {
+    const map = new Map()
+    for (const i of this.getFriendArray(id))
+      map.set(i.user_id, i)
+    return map
+  }
+
+  getGroupArray(id) {
+    const array = []
+    for (const [guild_id, guild] of Bot[id].guilds)
+      for (const [channel_id, channel] of guild.channels)
+        array.push({
+          guild,
+          channel,
+          group_id: `dc_${channel.id}`,
+          group_name: `${guild.name}-${channel.name}`,
+        })
+    return array
+  }
+
+  getGroupList(id) {
+    const array = []
+    for (const { group_id } of this.getGroupArray(id))
+      array.push(group_id)
+    return array
+  }
+
+  getGroupMap(id) {
+    const map = new Map()
+    for (const i of this.getGroupArray(id))
+      map.set(i.group_id, i)
+    return map
   }
 
   pickFriend(id, user_id) {
@@ -88,8 +147,8 @@ const adapter = new class DiscordAdapter {
       recallMsg: () => false,
       makeForwardMsg: Bot.makeForwardMsg,
       sendForwardMsg: msg => Bot.sendForwardMsg(msg => this.sendFriendMsg(i, msg), msg),
-      getInfo: () => i,
-      getAvatarUrl: () => this.getAvatarUrl(i),
+      getInfo: () => this.getFriendInfo(i),
+      getAvatarUrl: async () => (await this.getFriendInfo(i)).avatar,
     }
   }
 
@@ -121,6 +180,7 @@ const adapter = new class DiscordAdapter {
       makeForwardMsg: Bot.makeForwardMsg,
       sendForwardMsg: msg => Bot.sendForwardMsg(msg => this.sendMsg(i, msg), msg),
       getInfo: () => i,
+      getAvatarUrl: () => i.guild.iconURL,
       pickMember: user_id => this.pickMember(id, i.id, user_id),
     }
   }
@@ -133,7 +193,6 @@ const adapter = new class DiscordAdapter {
       nickname: data.author.username,
       avatar: data.author.avatarURL,
     }
-    data.bot.fl.set(data.user_id, { ...data.author, ...data.sender })
 
     data.message = []
     data.raw_message = ""
@@ -168,11 +227,6 @@ const adapter = new class DiscordAdapter {
       data.message_type = "group"
       data.group_id = `dc_${data.channel.id}`
       data.group_name = `${data.channel.guild.name}-${data.channel.name}`
-      data.bot.gl.set(data.group_id, {
-        ...data.channel,
-        group_id: data.group_id,
-        group_name: data.group_name,
-      })
 
       logger.info(`${logger.blue(`[${data.self_id}]`)} 群消息：[${data.group_name}(${data.group_id}), ${data.sender.nickname}(${data.user_id})] ${data.raw_message}`)
       data.friend = data.bot.pickFriend(data.user_id)
@@ -230,14 +284,23 @@ const adapter = new class DiscordAdapter {
       version: config.package.dependencies.eris,
     }
     Bot[id].stat = { start_time: Bot[id].startTime/1000 }
-    Bot[id].fl = new Map()
-    Bot[id].gl = new Map()
 
     Bot[id].pickFriend = user_id => this.pickFriend(id, user_id)
     Bot[id].pickUser = Bot[id].pickFriend
 
+    Bot[id].getFriendArray = () => this.getFriendArray(id)
+    Bot[id].getFriendList = () => this.getFriendList(id)
+    Bot[id].getFriendMap = () => this.getFriendMap(id)
+
     Bot[id].pickMember = (group_id, user_id) => this.pickMember(id, group_id, user_id)
     Bot[id].pickGroup = group_id => this.pickGroup(id, group_id)
+
+    Bot[id].getGroupArray = () => this.getGroupArray(id)
+    Bot[id].getGroupList = () => this.getGroupList(id)
+    Bot[id].getGroupMap = () => this.getGroupMap(id)
+
+    Object.defineProperty(Bot[id], "fl", { get() { return this.getFriendMap() }})
+    Object.defineProperty(Bot[id], "gl", { get() { return this.getGroupMap() }})
 
     if (!Bot.uin.includes(id))
       Bot.uin.push(id)
