@@ -2,6 +2,8 @@ logger.info(logger.yellow("- 正在加载 Discord 适配器插件"))
 
 import { config, configSave } from "./Model/config.js"
 import fetch from "node-fetch"
+import path from "node:path"
+import { fileTypeFromBuffer } from "file-type"
 import Eris from "eris"
 import { HttpsProxyAgent } from "https-proxy-agent"
 
@@ -19,63 +21,90 @@ const adapter = new class DiscordAdapter {
     return file
   }
 
+  async fileType(data) {
+    const file = {}
+    try {
+      file.url = data.replace(/^base64:\/\/.*/, "base64://...")
+      file.buffer = await this.makeBuffer(data)
+      if (Buffer.isBuffer(file.buffer)) {
+        file.type = await fileTypeFromBuffer(file.buffer)
+        file.name = `${Date.now()}.${file.type.ext}`
+      } else {
+        file.name = path.basename(file.buffer)
+      }
+    } catch (err) {
+      logger.error(`文件类型检测错误：${logger.red(err)}`)
+    }
+    return file
+  }
+
   async makeMsg(msg) {
     if (!Array.isArray(msg))
       msg = [msg]
-    let content = "", msgs = ""
-    const file = []
+    let msg_log = ""
+    const content = { content: "" }, files = []
 
     for (let i of msg) {
       if (typeof i != "object")
-        i = { type: "text", data: { text: i }}
-      else if (!i.data)
-        i = { type: i.type, data: { ...i, type: undefined }}
+        i = { type: "text", text: i }
+
+      let file
+      if (i.file) {
+        file = await this.fileType(i.file)
+        files.push({ name: file.name, file: file.buffer })
+      }
+
       switch (i.type) {
         case "text":
-          content += i.data.text
+          msg_log += i.text
+          content.content += i.text
           break
         case "image":
-          msgs += `[图片：${i.data.file.replace(/^base64:\/\/.*/, "base64://...")}]`
-          file.push({ name: "image.png", file: await this.makeBuffer(i.data.file) })
+          msg_log += `[图片：${file.name}(${file.url})]`
           break
         case "record":
-          msgs += `[音频：${i.data.file.replace(/^base64:\/\/.*/, "base64://...")}]`
-          file.push({ name: "audio.mp3", file: await this.makeBuffer(i.data.file) })
+          msg_log += `[音频：${file.name}(${file.url})]`
           break
         case "video":
-          msgs += `[视频：${i.data.file.replace(/^base64:\/\/.*/, "base64://...")}]`
-          file.push({ name: "video.mp4", file: await this.makeBuffer(i.data.file) })
+          msg_log += `[视频：${file.name}(${file.url})]`
           break
         case "reply":
+          msg_log += `[回复：${i.id}]`
+          content.messageReference = { messageID: i.id }
           break
         case "at":
-          if (i.data.qq == "all")
-            content += "@everyone"
+          msg_log += `[提及：${i.qq}]`
+          if (i.qq == "all")
+            content.content += "@everyone"
           else
-            content += `<@${i.data.qq.replace(/^dc_/, "")}>`
+            content.content += `<@${i.qq.replace(/^dc_/, "")}>`
           break
         case "node":
           for (const { message } of i.data) {
             const ret = await this.makeMsg(message)
-            if (ret.msgs)
-              msgs += `\n${ret.msgs}`
-            if (ret.content)
-              content += `\n${ret.content}`
-            file.push(...ret.file)
+            if (ret.msg_log)
+              msg_log += `\n${ret.msg_log}`
+            if (ret.content.content)
+              content.content += `\n${ret.content.content}`
+            if (ret.content.messageReference)
+              content.messageReference = ret.content.messageReference
+            if (ret.files.length)
+              files.push(...ret.files)
           }
           break
         default:
           i = JSON.stringify(i)
-          content += i
+          msg_log += i
+          content.content += i
       }
     }
-    return { content, msgs, file }
+    return { content, msg_log, files }
   }
 
   async sendMsg(data, msg) {
-    const { content, msgs, file } = await this.makeMsg(msg)
-    logger.info(`${logger.blue(`[${data.self_id}]`)} 发送消息：[${data.id}] ${content}${msgs}`)
-    const ret = await data.bot.createMessage(data.id, content, file)
+    const { content, msg_log, files } = await this.makeMsg(msg)
+    logger.info(`${logger.blue(`[${data.self_id}]`)} 发送消息：[${data.id}] ${msg_log}`)
+    const ret = await data.bot.createMessage(data.id, content, files)
     return { data: ret, message_id: ret.id }
   }
 
