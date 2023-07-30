@@ -1,3 +1,5 @@
+<div align="center">
+
 # TRSS-Yunzai Discord Plugin
 
 TRSS-Yunzai Discord Bot 适配器 插件
