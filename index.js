@@ -11,6 +11,7 @@ const adapter = new class DiscordAdapter {
   constructor() {
     this.id = "Discord"
     this.name = "DiscordBot"
+    this.version = `eris-${config.package.dependencies.eris.replace("^", "v")}`
   }
 
   async makeBuffer(file) {
@@ -348,7 +349,7 @@ const adapter = new class DiscordAdapter {
     })
 
     if (!bot.user?.id) {
-      logger.error(`${logger.blue(`[${token}]`)} ${this.name}(${this.id}) 连接失败`)
+      logger.error(`${logger.blue(`[${token}]`)} ${this.name}(${this.id}) ${this.version} 连接失败`)
       bot.disconnect()
       return false
     }
@@ -363,7 +364,7 @@ const adapter = new class DiscordAdapter {
     Bot[id].version = {
       id: this.id,
       name: this.name,
-      version: config.package.dependencies.eris,
+      version: this.version,
     }
     Bot[id].stat = { start_time: Bot[id].startTime/1000 }
 
@@ -393,7 +394,7 @@ const adapter = new class DiscordAdapter {
       this.makeMessage(data)
     })
 
-    logger.mark(`${logger.blue(`[${id}]`)} ${this.name}(${this.id}) 已连接`)
+    logger.mark(`${logger.blue(`[${id}]`)} ${this.name}(${this.id}) ${this.version} 已连接`)
     Bot.emit(`connect.${id}`, Bot[id])
     Bot.emit("connect", Bot[id])
     return true
