@@ -305,6 +305,7 @@ const adapter = new class DiscordAdapter {
   makeMessage(data) {
     data.post_type = "message"
     data = this.makeMessageArray(data)
+    if (data.user_id == data.self_id) return
 
     if (data.guildID) {
       data.message_type = "group"
