@@ -124,6 +124,7 @@ const adapter = new class DiscordAdapter {
   }
 
   recallMsg(data, message_id) {
+    logger.info(`${logger.blue(`[${data.self_id}]`)} 撤回消息：[${data.id}] ${message_id}`)
     return data.bot.deleteMessage(data.id, message_id)
   }
 
@@ -207,8 +208,6 @@ const adapter = new class DiscordAdapter {
       sendMsg: msg => this.sendFriendMsg(i, msg),
       getMsg: message_id => this.getFriendMsg(i, message_id),
       recallMsg: message_id => this.recallFriendMsg(i, message_id),
-      makeForwardMsg: Bot.makeForwardMsg,
-      sendForwardMsg: msg => Bot.sendForwardMsg(msg => this.sendFriendMsg(i, msg), msg),
       getInfo: () => this.getFriendInfo(i),
       getAvatarUrl: async () => (await this.getFriendInfo(i)).avatar,
     }
@@ -240,9 +239,6 @@ const adapter = new class DiscordAdapter {
       sendMsg: msg => this.sendMsg(i, msg),
       getMsg: message_id => this.getMsg(i, message_id),
       recallMsg: message_id => this.recallMsg(i, message_id),
-      makeForwardMsg: Bot.makeForwardMsg,
-      sendForwardMsg: msg => Bot.sendForwardMsg(msg => this.sendMsg(i, msg), msg),
-      getInfo: () => i,
       getAvatarUrl: () => i.guild.iconURL,
       pickMember: user_id => this.pickMember(id, i.id, user_id),
     }
@@ -311,15 +307,10 @@ const adapter = new class DiscordAdapter {
       data.message_type = "group"
       data.group_id = `dc_${data.channel.id}`
       data.group_name = `${data.channel.guild.name}-${data.channel.name}`
-
       logger.info(`${logger.blue(`[${data.self_id}]`)} 群消息：[${data.group_name}(${data.group_id}), ${data.sender.nickname}(${data.user_id})] ${data.raw_message}`)
-      data.friend = data.bot.pickFriend(data.user_id)
-      data.group = data.bot.pickGroup(data.group_id)
-      data.member = data.group.pickMember(data.user_id)
     } else {
       data.message_type = "private"
       logger.info(`${logger.blue(`[${data.self_id}]`)} 好友消息：[${data.sender.nickname}(${data.user_id})] ${data.raw_message}`)
-      data.friend = data.bot.pickFriend(data.user_id)
     }
 
     Bot.emit(`${data.post_type}.${data.message_type}`, data)
