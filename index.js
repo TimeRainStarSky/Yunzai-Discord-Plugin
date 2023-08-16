@@ -313,6 +313,7 @@ const adapter = new class DiscordAdapter {
       logger.info(`${logger.blue(`[${data.self_id}]`)} 好友消息：[${data.sender.nickname}(${data.user_id})] ${data.raw_message}`)
     }
 
+    data.member = undefined
     Bot.emit(`${data.post_type}.${data.message_type}`, data)
     Bot.emit(`${data.post_type}`, data)
   }
