@@ -163,7 +163,7 @@ const adapter = new class DiscordAdapter {
   }
 
   getFriendMap(id) {
-    const map = new Map()
+    const map = new Map
     for (const i of this.getFriendArray(id))
       map.set(i.user_id, i)
     return map
@@ -190,9 +190,16 @@ const adapter = new class DiscordAdapter {
   }
 
   getGroupMap(id) {
-    const map = new Map()
+    const map = new Map
     for (const i of this.getGroupArray(id))
       map.set(i.group_id, i)
+    return map
+  }
+
+  getGroupMemberMap(id) {
+    const map = new Map
+    for (const i of this.getGroupList(id))
+      map.set(i, new Map)
     return map
   }
 
@@ -313,9 +320,8 @@ const adapter = new class DiscordAdapter {
       logger.info(`${logger.blue(`[${data.self_id}]`)} 好友消息：[${data.sender.nickname}(${data.user_id})] ${data.raw_message}`)
     }
 
-    data.member = undefined
-    Bot.emit(`${data.post_type}.${data.message_type}`, data)
-    Bot.emit(`${data.post_type}`, data)
+    delete data.member
+    Bot.em(`${data.post_type}.${data.message_type}`, data)
   }
 
   async connect(token) {
@@ -374,29 +380,25 @@ const adapter = new class DiscordAdapter {
     Bot[id].getGroupArray = () => this.getGroupArray(id)
     Bot[id].getGroupList = () => this.getGroupList(id)
     Bot[id].getGroupMap = () => this.getGroupMap(id)
+    Bot[id].getGroupMemberMap = () => this.getGroupMemberMap(id)
 
     Object.defineProperty(Bot[id], "fl", { get() { return this.getFriendMap() }})
     Object.defineProperty(Bot[id], "gl", { get() { return this.getGroupMap() }})
-
-    if (!Bot.uin.includes(id))
-      Bot.uin.push(id)
+    Object.defineProperty(Bot[id], "gml", { get() { return this.getGroupMemberMap() }})
 
     bot.on("messageCreate", data => {
       data.self_id = id
-      data.bot = Bot[id]
       this.makeMessage(data)
     })
 
     logger.mark(`${logger.blue(`[${id}]`)} ${this.name}(${this.id}) ${this.version} 已连接`)
-    Bot.emit(`connect.${id}`, Bot[id])
-    Bot.emit("connect", Bot[id])
+    Bot.em(`connect.${id}`, { self_id: id })
     return true
   }
 
   async load() {
     for (const token of config.token)
       await adapter.connect(token)
-    return true
   }
 }
 
