@@ -11,7 +11,7 @@ const adapter = new class DiscordAdapter {
   constructor() {
     this.id = "Discord"
     this.name = "DiscordBot"
-    this.version = `eris-${config.package.dependencies.eris.replace("^", "v")}`
+    this.version = `eris ${config.package.dependencies.eris.replace("^", "v")}`
   }
 
   async makeBuffer(file) {
@@ -342,10 +342,7 @@ const adapter = new class DiscordAdapter {
     const bot = new Eris(`Bot ${token}`, options)
     bot.on("error", logger.error)
     bot.connect()
-    await new Promise(resolve => {
-      bot.once("ready", resolve)
-      bot.once("error", resolve)
-    })
+    await new Promise(resolve => bot.once("ready", resolve))
 
     if (!bot.user?.id) {
       logger.error(`${logger.blue(`[${token}]`)} ${this.name}(${this.id}) ${this.version} 连接失败`)
@@ -398,7 +395,10 @@ const adapter = new class DiscordAdapter {
 
   async load() {
     for (const token of config.token)
-      await adapter.connect(token)
+      await new Promise(resolve => {
+        adapter.connect(token).then(resolve)
+        setTimeout(resolve, 5000)
+      })
   }
 }
 
