@@ -341,8 +341,12 @@ const adapter = new class DiscordAdapter {
 
     const bot = new Eris(`Bot ${token}`, options)
     bot.on("error", logger.error)
-    bot.connect()
-    await new Promise(resolve => bot.once("ready", resolve))
+    bot.login = bot.connect
+    bot.logout = bot.disconnect
+    await new Promise(resolve => {
+      bot.once("ready", resolve)
+      bot.login()
+    })
 
     if (!bot.user?.id) {
       logger.error(`${logger.blue(`[${token}]`)} ${this.name}(${this.id}) ${this.version} 连接失败`)
@@ -430,35 +434,35 @@ export class Discord extends plugin {
     })
   }
 
-  async List() {
-    await this.reply(`共${config.token.length}个账号：\n${config.token.join("\n")}`, true)
+  List() {
+    this.reply(`共${config.token.length}个账号：\n${config.token.join("\n")}`, true)
   }
 
   async Token() {
-    let token = this.e.msg.replace(/^#[Dd][Cc]设置/, "").trim()
+    const token = this.e.msg.replace(/^#[Dd][Cc]设置/, "").trim()
     if (config.token.includes(token)) {
       config.token = config.token.filter(item => item != token)
-      await this.reply(`账号已删除，重启后生效，共${config.token.length}个账号`, true)
+      this.reply(`账号已删除，重启后生效，共${config.token.length}个账号`, true)
     } else {
       if (await adapter.connect(token)) {
         config.token.push(token)
-        await this.reply(`账号已连接，共${config.token.length}个账号`, true)
+        this.reply(`账号已连接，共${config.token.length}个账号`, true)
       } else {
-        await this.reply(`账号连接失败`, true)
+        this.reply(`账号连接失败`, true)
         return false
       }
     }
     configSave(config)
   }
 
-  async Proxy() {
-    let proxy = this.e.msg.replace(/^#[Dd][Cc](代理|反代)/, "").trim()
+  Proxy() {
+    const proxy = this.e.msg.replace(/^#[Dd][Cc](代理|反代)/, "").trim()
     if (this.e.msg.match("代理")) {
       config.proxy = proxy
-      await this.reply(`代理已${proxy?"设置":"删除"}，重启后生效`, true)
+      this.reply(`代理已${proxy?"设置":"删除"}，重启后生效`, true)
     } else {
       config.reverseProxy = proxy
-      await this.reply(`反代已${proxy?"设置":"删除"}，重启后生效`, true)
+      this.reply(`反代已${proxy?"设置":"删除"}，重启后生效`, true)
     }
     configSave(config)
   }
