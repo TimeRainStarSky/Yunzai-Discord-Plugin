@@ -1,7 +1,6 @@
 logger.info(logger.yellow("- 正在加载 Discord 适配器插件"))
 
 import { config, configSave } from "./Model/config.js"
-import fetch from "node-fetch"
 import path from "node:path"
 import { fileTypeFromBuffer } from "file-type"
 import Eris from "eris"
@@ -14,19 +13,16 @@ const adapter = new class DiscordAdapter {
     this.version = `eris ${config.package.dependencies.eris.replace("^", "v")}`
   }
 
-  async makeBuffer(file) {
-    if (file.match(/^base64:\/\//))
-      return Buffer.from(file.replace(/^base64:\/\//, ""), "base64")
-    else if (file.match(/^https?:\/\//))
-      return Buffer.from(await (await fetch(file)).arrayBuffer())
-    return file
-  }
-
-  async fileType(data) {
+  async fileType(data, name) {
     const file = {}
     try {
-      file.url = data.replace(/^base64:\/\/.*/, "base64://...")
-      file.buffer = await this.makeBuffer(data)
+      if (Buffer.isBuffer(data)) {
+        file.url = name || "Buffer"
+        file.buffer = data
+      } else {
+        file.url = data.replace(/^base64:\/\/.*/, "base64://...")
+        file.buffer = await Bot.Buffer(data)
+      }
       if (Buffer.isBuffer(file.buffer)) {
         file.type = await fileTypeFromBuffer(file.buffer)
         file.name = `${Date.now()}.${file.type.ext}`
@@ -51,7 +47,7 @@ const adapter = new class DiscordAdapter {
 
       let file
       if (i.file) {
-        file = await this.fileType(i.file)
+        file = await this.fileType(i.file, i.name)
         files.push({ name: file.name, file: file.buffer })
       }
 
@@ -104,7 +100,7 @@ const adapter = new class DiscordAdapter {
 
   async sendMsg(data, msg) {
     const { content, msg_log, files } = await this.makeMsg(msg)
-    logger.info(`${logger.blue(`[${data.self_id}]`)} 发送消息：[${data.id}] ${msg_log}`)
+    Bot.makeLog("info", `发送消息：[${data.id}] ${msg_log}`, data.self_id)
     const ret = await data.bot.createMessage(data.id, content, files)
     return { data: ret, message_id: ret.id }
   }
@@ -124,7 +120,7 @@ const adapter = new class DiscordAdapter {
   }
 
   recallMsg(data, message_id) {
-    logger.info(`${logger.blue(`[${data.self_id}]`)} 撤回消息：[${data.id}] ${message_id}`)
+    Bot.makeLog("info", `撤回消息：[${data.id}] ${message_id}`, data.self_id)
     return data.bot.deleteMessage(data.id, message_id)
   }
 
@@ -314,10 +310,10 @@ const adapter = new class DiscordAdapter {
       data.message_type = "group"
       data.group_id = `dc_${data.channel.id}`
       data.group_name = `${data.channel.guild.name}-${data.channel.name}`
-      logger.info(`${logger.blue(`[${data.self_id}]`)} 群消息：[${data.group_name}(${data.group_id}), ${data.sender.nickname}(${data.user_id})] ${data.raw_message}`)
+      Bot.makeLog("info", `群消息：[${data.group_name}(${data.group_id}), ${data.sender.nickname}(${data.user_id})] ${data.raw_message}`, data.self_id)
     } else {
       data.message_type = "private"
-      logger.info(`${logger.blue(`[${data.self_id}]`)} 好友消息：[${data.sender.nickname}(${data.user_id})] ${data.raw_message}`)
+      Bot.makeLog("info", `好友消息：[${data.sender.nickname}(${data.user_id})] ${data.raw_message}`, data.self_id)
     }
 
     delete data.member
