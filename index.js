@@ -2,7 +2,6 @@ logger.info(logger.yellow("- 正在加载 Discord 适配器插件"))
 
 import { config, configSave } from "./Model/config.js"
 import path from "node:path"
-import { fileTypeFromBuffer } from "file-type"
 import Eris from "eris"
 import { HttpsProxyAgent } from "https-proxy-agent"
 
@@ -11,28 +10,6 @@ const adapter = new class DiscordAdapter {
     this.id = "Discord"
     this.name = "DiscordBot"
     this.version = `eris ${config.package.dependencies.eris.replace("^", "v")}`
-  }
-
-  async fileType(data, name) {
-    const file = {}
-    try {
-      if (Buffer.isBuffer(data)) {
-        file.url = name || "Buffer"
-        file.buffer = data
-      } else {
-        file.url = data.replace(/^base64:\/\/.*/, "base64://...")
-        file.buffer = await Bot.Buffer(data)
-      }
-      if (Buffer.isBuffer(file.buffer)) {
-        file.type = await fileTypeFromBuffer(file.buffer)
-        file.name = `${Date.now()}.${file.type.ext}`
-      } else {
-        file.name = path.basename(file.buffer)
-      }
-    } catch (err) {
-      logger.error(`文件类型检测错误：${logger.red(err)}`)
-    }
-    return file
   }
 
   async makeMsg(msg) {
@@ -47,7 +24,7 @@ const adapter = new class DiscordAdapter {
 
       let file
       if (i.file) {
-        file = await this.fileType(i.file, i.name)
+        file = await Bot.fileType(i.file, i.name)
         files.push({ name: file.name, file: file.buffer })
       }
 
@@ -57,13 +34,13 @@ const adapter = new class DiscordAdapter {
           content.content += i.text
           break
         case "image":
-          msg_log += `[图片：${file.name}(${file.url})]`
+          msg_log += `[图片：${file.name}(${file.url} ${(file.buffer.length/1024).toFixed(2)}KB)]`
           break
         case "record":
-          msg_log += `[音频：${file.name}(${file.url})]`
+          msg_log += `[音频：${file.name}(${file.url} ${(file.buffer.length/1024).toFixed(2)}KB)]`
           break
         case "video":
-          msg_log += `[视频：${file.name}(${file.url})]`
+          msg_log += `[视频：${file.name}(${file.url} ${(file.buffer.length/1024).toFixed(2)}KB)]`
           break
         case "reply":
           msg_log += `[回复：${i.id}]`
