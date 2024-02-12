@@ -1,15 +1,27 @@
 logger.info(logger.yellow("- 正在加载 Discord 适配器插件"))
 
-import { config, configSave } from "./Model/config.js"
-import path from "node:path"
+import makeConfig from "../../lib/plugins/config.js"
 import Eris from "eris"
 import { HttpsProxyAgent } from "https-proxy-agent"
+
+const { config, configSave } = await makeConfig("Discord", {
+  tips: "",
+  permission: "master",
+  proxy: "",
+  reverseProxy: "",
+  token: [],
+}, {
+  tips: [
+    "欢迎使用 TRSS-Yunzai Discord Plugin ! 作者：时雨🌌星空",
+    "参考：https://github.com/TimeRainStarSky/Yunzai-Discord-Plugin",
+  ],
+})
 
 const adapter = new class DiscordAdapter {
   constructor() {
     this.id = "Discord"
     this.name = "DiscordBot"
-    this.version = `eris ${config.package.dependencies.eris.replace("^", "v")}`
+    this.version = `eris v0.17.2`
   }
 
   async makeMsg(msg) {
@@ -66,6 +78,8 @@ const adapter = new class DiscordAdapter {
               files.push(...ret.files)
           }
           break
+        case "button":
+          continue
         default:
           i = JSON.stringify(i)
           msg_log += i
@@ -425,10 +439,10 @@ export class Discord extends plugin {
         return false
       }
     }
-    configSave(config)
+    await configSave()
   }
 
-  Proxy() {
+  async Proxy() {
     const proxy = this.e.msg.replace(/^#[Dd][Cc](代理|反代)/, "").trim()
     if (this.e.msg.match("代理")) {
       config.proxy = proxy
@@ -437,7 +451,7 @@ export class Discord extends plugin {
       config.reverseProxy = proxy
       this.reply(`反代已${proxy?"设置":"删除"}，重启后生效`, true)
     }
-    configSave(config)
+    await configSave()
   }
 }
 
