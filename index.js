@@ -36,7 +36,7 @@ const adapter = new class DiscordAdapter {
 
       let file
       if (i.file) {
-        file = await Bot.fileType(i.file, i.name)
+        file = await Bot.fileType(i)
         files.push({ name: file.name, file: file.buffer })
       }
 
