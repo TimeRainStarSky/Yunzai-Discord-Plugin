@@ -18,11 +18,9 @@ const { config, configSave } = await makeConfig("Discord", {
 })
 
 const adapter = new class DiscordAdapter {
-  constructor() {
-    this.id = "Discord"
-    this.name = "DiscordBot"
-    this.version = `eris v0.17.2`
-  }
+  id = "Discord"
+  name = "DiscordBot"
+  version = "eris v0.17.2"
 
   async makeMsg(msg) {
     if (!Array.isArray(msg))
@@ -31,7 +29,7 @@ const adapter = new class DiscordAdapter {
     const content = { content: "" }, files = []
 
     for (let i of msg) {
-      if (typeof i != "object")
+      if (typeof i !== "object")
         i = { type: "text", text: i }
 
       let file
@@ -60,7 +58,7 @@ const adapter = new class DiscordAdapter {
           break
         case "at":
           msg_log += `[提及：${i.qq}]`
-          if (i.qq == "all")
+          if (i.qq === "all")
             content.content += "@everyone"
           else
             content.content += `<@${i.qq.replace(/^dc_/, "")}>`
@@ -191,6 +189,8 @@ const adapter = new class DiscordAdapter {
   }
 
   pickFriend(id, user_id) {
+    if (typeof user_id !== "string")
+      user_id = String(user_id)
     const i = {
       ...Bot[id].fl.get(user_id),
       self_id: id,
@@ -208,6 +208,10 @@ const adapter = new class DiscordAdapter {
   }
 
   pickMember(id, group_id, user_id) {
+    if (typeof group_id !== "string")
+      group_id = String(group_id)
+    if (typeof user_id !== "string")
+      user_id = String(user_id)
     const i = {
       ...Bot[id].fl.get(user_id),
       self_id: id,
@@ -222,6 +226,8 @@ const adapter = new class DiscordAdapter {
   }
 
   pickGroup(id, group_id) {
+    if (typeof group_id !== "string")
+      group_id = String(group_id)
     const i = {
       ...Bot[id].gl.get(group_id),
       self_id: id,
@@ -295,7 +301,7 @@ const adapter = new class DiscordAdapter {
   makeMessage(data) {
     data.post_type = "message"
     data = this.makeMessageArray(data)
-    if (data.user_id == data.self_id) return
+    if (data.user_id === data.self_id) return
 
     if (data.guildID) {
       data.message_type = "group"
@@ -336,7 +342,7 @@ const adapter = new class DiscordAdapter {
     })
 
     if (!bot.user?.id) {
-      logger.error(`${logger.blue(`[${token}]`)} ${this.name}(${this.id}) ${this.version} 连接失败`)
+      Bot.makeLog("error", `${this.name}(${this.id}) ${this.version} 连接失败`, token)
       bot.disconnect()
       return false
     }
@@ -379,17 +385,14 @@ const adapter = new class DiscordAdapter {
       this.makeMessage(data)
     })
 
-    logger.mark(`${logger.blue(`[${id}]`)} ${this.name}(${this.id}) ${this.version} 已连接`)
+    Bot.makeLog("mark", `${this.name}(${this.id}) ${this.version} 已连接`, id)
     Bot.em(`connect.${id}`, { self_id: id })
     return true
   }
 
   async load() {
     for (const token of config.token)
-      await new Promise(resolve => {
-        adapter.connect(token).then(resolve)
-        setTimeout(resolve, 5000)
-      })
+      await Bot.sleep(5000, this.connect(token))
   }
 }
 
@@ -428,7 +431,7 @@ export class Discord extends plugin {
   async Token() {
     const token = this.e.msg.replace(/^#[Dd][Cc]设置/, "").trim()
     if (config.token.includes(token)) {
-      config.token = config.token.filter(item => item != token)
+      config.token = config.token.filter(item => item !== token)
       this.reply(`账号已删除，重启后生效，共${config.token.length}个账号`, true)
     } else {
       if (await adapter.connect(token)) {
